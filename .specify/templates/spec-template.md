@@ -2,7 +2,7 @@
 
 **Feature Branch**: `[###-feature-name]`  
 **Created**: [DATE]  
-**Status**: Draft  
+**Status**: Draft | **Constitution Compliance**: Must include independent tests per user story (Principles III–IV); MUST include structured logging for security/auth events (Principle V); complexity MUST be justified (Principle VI)  
 **Input**: User description: "$ARGUMENTS"
 
 ## User Scenarios & Testing *(mandatory)*

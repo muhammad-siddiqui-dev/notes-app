@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: Notes App API
+  description: REST API for Notes App core note management; compatible with Weekly Digest contract
+  version: 1.0.0
+servers:
+  - url: https://notes-app.vercel.app/api
+paths:
+  /notes:
+    get:
+      summary: List visible notes for user
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          description: OAuth identity provider claim (user isolation)
+        - name: search
+          in: query
+          required: false
+          description: Basic text filter on title/content
+      responses:
+        200:
+          description: List of visible notes (Digest-compatible)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Note'
+    post:
+      summary: Create a new note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteCreate'
+      responses:
+        201:
+          description: Note created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+  /notes/{id}:
+    put:
+      summary: Edit note title/content (updates updated_at)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Note UUID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NoteEdit'
+      responses:
+        200:
+          description: Note updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Note'
+  /notes/{id}/featured:
+    patch:
+      summary: Toggle featured flag
+      parameters:
+        - name: id
+          in: path
+          required: true
+      responses:
+        200:
+          description: Featured status updated
+  /notes/{id}/visibility:
+    patch:
+      summary: Set visibility (soft-delete / restore)
+      parameters:
+        - name: id
+          in: path
+          required: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                visible:
+                  type: boolean
+      responses:
+        200:
+          description: Visibility updated; invisible notes excluded from Digest
+components:
+  schemas:
+    Note:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        title:
+          type: string
+        content:
+          type: string
+        created_at:
+          type: string (ISO timestamp)
+        updated_at:
+          type: string (ISO timestamp)
+        featured:
+          type: boolean
+        visible:
+          type: boolean
+    NoteCreate:
+      type: object
+      required: [title, content, user_id]
+      properties:
+        title: { type: string }
+        content: { type: string }
+        user_id: { type: string }
+    NoteEdit:
+      type: object
+      required: [title, content]
+      properties:
+        title: { type: string }
+        content: { type: string }

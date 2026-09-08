@@ -31,7 +31,7 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+[Gates: (1) Spec-First (spec.md complete with user stories + independent tests); (2) CLI Interface Protocol (stdin/stdout, JSON + human-readable); (3) Test-First (tests fail before implementation); (4) Integration Testing (contract + inter-service tests planned); (5) Observability (structured logging defined); (6) Simplicity & YAGNI (complexity justified with simpler alternative rejected)]
 
 ## Project Structure
 

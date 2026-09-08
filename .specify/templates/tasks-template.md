@@ -8,7 +8,13 @@ description: "Task list template for feature implementation"
 **Input**: Design documents from `/specs/[###-feature-name]/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Principle-Driven Task Types** (per constitution):
+- Testing discipline: Every user story MUST include contract + integration test tasks (Principles III–IV).
+- Observability: Every service/task MUST include structured logging setup (Principle V).
+- Simplicity check: Every feature MUST include a complexity justification task if violating the 3-project/3-service default (Principle VI).
+- Versioning: Any library or contract change MUST include a version bump task (Principle VI).
+
+**Tests**: The examples below include test tasks. Tests are MANDATORY for all features per Principles III–IV.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
