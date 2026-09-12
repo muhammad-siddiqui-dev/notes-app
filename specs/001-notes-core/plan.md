@@ -73,6 +73,24 @@ frontend/
 - Digest contract requires full content preservation, `visible` exclusion, `featured` ranking, `updated_at` tracking.
 - Integration mechanism resolved by clarification Q2: REST / JSON API (decoupled, allows independent schema evolution, aligns with Digest cron architecture).
 
+### Production Authentication Design (P-C — Real OAuth2/OIDC Hardening)
+
+**Purpose**: Replace framework-only authentication (`auth.ts` synthetic derivation) with production-grade OAuth2/OIDC identity claim verification (`sub`, `iss`, `aud`, `exp`, signature via JWKS).
+
+**Provider approach**: NextAuth.js (`next-auth`) with real OAuth2/OIDC provider adapter (Google OAuth2, GitHub OAuth, Auth0, or equivalent). The framework (`auth.ts`, `.env` settings, middleware integration) is preserved; synthetic derivation (`derivedUserId`) is explicitly prohibited.
+
+**Token verification framework**: Middleware verifies `Authorization: Bearer <JWT>`; `jwt.verify()` validates `sub` claim, `iss` (provider `.well-known`), `aud` (`OAUTH_CLIENT_ID`), `exp` (not expired), and `RS256` signature (provider JWKS endpoint).
+
+**Stable identity**: `(req).user.id = token.sub` (verified UUID claim). `(req).user.email = token.email ?? undefined`.
+
+**Isolation**: All protected endpoints (`POST`, `PUT`, `PATCH` feature/visibility) enforce `user_id = req.user.id` at middleware/query layer.
+
+**Mapping mechanism**: Verified `sub` claim connects to Digest `users.id` through dedicated user mapping mechanism (`users.external_id` column or mapping table). `userMapping.ts` must use `sub` claim (not email only) for lookup.
+
+**Secrets (`.env`)**: `OAUTH_PROVIDER`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, optionally `JWT_ISSUER`, `JWT_AUDIENCE`. No hardcoded secrets (`T048`).
+
+**Tests**: Contract + integration + unit for valid JWT (`sub` verified), invalid signature, expired (`exp` past), wrong `iss`, wrong `aud`, tampered payload (`alg: none`).
+
 ## Phase 1: Design & Contracts
 
 **Prerequisites**: `research.md` complete; clarification session complete (5/5 questions resolved); spec validated.
@@ -107,3 +125,13 @@ No constitution violations requiring justification. Principles I–VI satisfied 
 ---
 
 *Plan completed. Stack confirmed: Next.js, TypeScript, PostgreSQL. Ready for `/sp.implement`. No deferred architecture decisions remain; database framework selection (Next.js framework details, PostgreSQL adapter) can proceed directly to implementation.*
+
+### Production Authentication Design (P-C — Real OAuth2/OIDC Hardening)
+
+**Provider approach**: NextAuth.js (`next-auth`) or equivalent established OAuth2/OIDC library with real provider adapter (Google OAuth2, GitHub OAuth, Auth0 OIDC, or provider with `.well-known/openid-configuration` endpoint). Framework references (`auth.ts`) preserved; synthetic derivation (`derivedUserId`) explicitly prohibited for production.
+
+**Token verification framework**: Middleware verifies `Authorization: Bearer <JWT>` using provider JWKS endpoint; `jwt.verify()` validates `sub` claim (required UUID identity), `iss` (issuer against `.env` `JWT_ISSUER` or provider `.well-known`), `aud` (audience against `.env` `OAUTH_CLIENT_ID`), `exp` (expiry — rejected if past current time with 30s clock tolerance), `RS256` signature (provider public key from JWKS endpoint). `.env` variables: `OAUTH_PROVIDER`, `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`, optionally `JWT_ISSUER`, `JWT_AUDIENCE`. No hardcoded secrets (`T048`); `.env` must exist with real settings.
+
+**Stable identity and Digest mapping**: Verified `sub` claim (UUID string) links to Digest `users.id` (integer FK) through dedicated mapping mechanism (`users.external_id` column or `user_mapping` table linking `sub_uuid` → `digest_user_id`). `resolveDigestUserId` uses `sub` claim lookup (primary) with `email` fallback; mapping must enforce unique `sub` per Digest user for multi-user isolation.
+
+**Failure behavior**: Structured JSON error logs (`console.error` to stderr; `timestamp`, `level: "error"`, `user_id: null`, `message`, `component: "auth-middleware"`) for missing/invalid/expired tokens, wrong issuer (`403`), wrong audience (`403`), invalid signature (`401`), tampered payload (`401`). No synthetic identity derivation permitted in production middleware.

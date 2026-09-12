@@ -1,4 +1,10 @@
+import { existsSync } from "node:fs";
+import { loadEnvFile } from "node:process";
 import { Pool } from "pg";
+
+if (existsSync(".env")) {
+  loadEnvFile(".env");
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

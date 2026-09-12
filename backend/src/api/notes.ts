@@ -4,7 +4,7 @@
 // Middleware integration: authentication middleware (auth.ts) for user isolation (FR-009, Q1 OAuth2);
 // structured logging middleware (logging.ts) for observability (Principle V, FR-010)
 
-import { validateNoteCreate } from "../utils/validation";
+import { validateNoteCreate, validateNoteEdit } from "../utils/validation";
 import { handleError, ValidationError } from "../utils/errors";
 import { logNoteOperation } from "../middleware/logging";
 
@@ -19,7 +19,7 @@ export interface NoteResponse {
   visible: boolean;
 }
 
-export const createNoteHandler = (req: { user?: { id: string }; body?: { title?: string; content?: string; user_id?: string } }): NoteResponse | { error: string; statusCode: number } => {
+export const createNoteHandler = async (req: { user?: { id: string }; body?: { title?: string; content?: string; user_id?: string } }): Promise<NoteResponse | { error: string; statusCode: number }> => {
   try {
     const payload = req.body || {};
     const userId = req.user?.id || payload.user_id || "unknown";
@@ -27,16 +27,16 @@ export const createNoteHandler = (req: { user?: { id: string }; body?: { title?:
     if (!validation.valid) {
       throw new ValidationError(validation.errors.join(" "));
     }
-    // Note creation simulation using NoteDefaults (data-model.md: create defaults `visible=true`, `featured=false`)
+    const serviceNote = await noteService.createNote({ title: payload.title || "", content: payload.content || "", user_id: userId }, userId);
     const newNote: NoteResponse = {
-      id: `note-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-      user_id: userId,
-      title: payload.title || "",
-      content: payload.content || "",
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      featured: false,
-      visible: true
+      id: serviceNote.id,
+      user_id: serviceNote.user_id,
+      title: serviceNote.title,
+      content: serviceNote.content,
+      created_at: (serviceNote.created_at instanceof Date) ? serviceNote.created_at.toISOString() : String(serviceNote.created_at),
+      updated_at: (serviceNote.updated_at instanceof Date) ? serviceNote.updated_at.toISOString() : String(serviceNote.updated_at),
+      featured: serviceNote.featured,
+      visible: serviceNote.visible
     };
     logNoteOperation("create", userId, newNote.id, { title: newNote.title, visible: newNote.visible, featured: newNote.featured });
     return newNote;
@@ -135,6 +135,37 @@ export const toggleFeaturedHandler = async (req: { user?: { id: string }; params
     return responseNote;
   } catch (err) {
     const appError = handleError(err, "PATCH /api/notes/:id/featured");
+    return { error: appError.message, statusCode: appError.statusCode };
+  }
+};
+
+export const editNoteHandler = async (req: { user?: { id: string }; params?: { id?: string }; body?: { title?: string; content?: string; user_id?: string } }): Promise<NoteResponse | { error: string; statusCode: number }> => {
+  try {
+    const payload = req.body || {};
+    const userId = req.user?.id || payload.user_id || "unknown";
+    const id = req.params?.id || "";
+    if (!id || id.trim().length === 0) {
+      throw new ValidationError("Note ID is required for edit.");
+    }
+    const validation = validateNoteEdit(payload);
+    if (!validation.valid) {
+      throw new ValidationError(validation.errors.join(" "));
+    }
+    const serviceNote = await noteService.updateNote(id, userId, { title: payload.title, content: payload.content });
+    const responseNote: NoteResponse = {
+      id: serviceNote.id,
+      user_id: serviceNote.user_id,
+      title: serviceNote.title,
+      content: serviceNote.content,
+      created_at: (serviceNote.created_at instanceof Date) ? serviceNote.created_at.toISOString() : String(serviceNote.created_at),
+      updated_at: (serviceNote.updated_at instanceof Date) ? serviceNote.updated_at.toISOString() : String(serviceNote.updated_at),
+      featured: serviceNote.featured,
+      visible: serviceNote.visible
+    };
+    logNoteOperation("edit", userId, id, { title: serviceNote.title, updatedAt: serviceNote.updated_at });
+    return responseNote;
+  } catch (err) {
+    const appError = handleError(err, "PUT /api/notes/:id");
     return { error: appError.message, statusCode: appError.statusCode };
   }
 };
